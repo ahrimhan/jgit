@@ -369,7 +369,7 @@ public class WindowCache {
 			final Ref ref = createRef(pack, position, v);
 			hit(ref);
 			for (;;) {
-				final Entry n = new Entry(clean(e2), ref);
+				final Entry n = new Entry(e2 == null ? null : e2.clean(), ref);
 				if (table.compareAndSet(slot, e2, n))
 					break;
 				e2 = table.get(slot);
@@ -438,7 +438,7 @@ public class WindowCache {
 				old.kill();
 				gc();
 				final Entry e1 = table.get(slot);
-				table.compareAndSet(slot, e1, clean(e1));
+				table.compareAndSet(slot, e1, e1 == null ? null : e1.clean());
 			}
 		}
 	}
@@ -488,7 +488,7 @@ public class WindowCache {
 					hasDead = true;
 			}
 			if (hasDead)
-				table.compareAndSet(s, e1, clean(e1));
+				table.compareAndSet(s, e1, e1.clean());
 		}
 		gc();
 	}
@@ -520,7 +520,7 @@ public class WindowCache {
 					}
 				}
 				if (found)
-					table.compareAndSet(s, e1, clean(e1));
+					table.compareAndSet(s, e1, e1.clean());
 			}
 		}
 	}
@@ -533,16 +533,9 @@ public class WindowCache {
 		return locks[(hash(pack.hash, position) >>> 1) % locks.length];
 	}
 
-	private static Entry clean(Entry top) {
-		while (top != null && top.dead) {
-			top.ref.enqueue();
-			top = top.next;
-		}
-		if (top == null)
-			return null;
-		final Entry n = clean(top.next);
-		return n == top.next ? top : new Entry(n, top.ref);
-	}
+	// private static Entry clean(Entry top) {
+	// return top.clean();
+	// }
 
 	private static class Entry {
 		/** Next entry in the hash table's chain list. */
@@ -568,6 +561,18 @@ public class WindowCache {
 		final void kill() {
 			dead = true;
 			ref.enqueue();
+		}
+
+		public Entry clean() {
+			Entry top = this;
+			while (top != null && top.dead) {
+				top.ref.enqueue();
+				top = top.next;
+			}
+			if( top == null || top.next == null )
+				return null;
+			final Entry n = top.next.clean();
+			return n == top.next ? top : new Entry(n, top.ref);
 		}
 	}
 

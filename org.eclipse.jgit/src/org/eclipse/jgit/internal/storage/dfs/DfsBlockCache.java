@@ -365,7 +365,8 @@ public final class DfsBlockCache {
 			Ref<DfsBlock> ref = new Ref<>(key, position, v.size(), v);
 			ref.hot = true;
 			for (;;) {
-				HashEntry n = new HashEntry(clean(e2), ref);
+				HashEntry n = new HashEntry(e2 == null ? null : e2.clean(),
+						ref);
 				if (table.compareAndSet(slot, e2, n))
 					break;
 				e2 = table.get(slot);
@@ -469,7 +470,8 @@ public final class DfsBlockCache {
 			ref = new Ref<>(key, pos, size, v);
 			ref.hot = true;
 			for (;;) {
-				HashEntry n = new HashEntry(clean(e2), ref);
+				HashEntry n = new HashEntry(e2 == null ? null : e2.clean(),
+						ref);
 				if (table.compareAndSet(slot, e2, n))
 					break;
 				e2 = table.get(slot);
@@ -522,14 +524,6 @@ public final class DfsBlockCache {
 		return loadLocks[(hash(pack.hash, position) >>> 1) % loadLocks.length];
 	}
 
-	private static HashEntry clean(HashEntry top) {
-		while (top != null && top.ref.next == null)
-			top = top.next;
-		if (top == null)
-			return null;
-		HashEntry n = clean(top.next);
-		return n == top.next ? top : new HashEntry(n, top.ref);
-	}
 
 	private static final class HashEntry {
 		/** Next entry in the hash table's chain list. */
@@ -541,6 +535,16 @@ public final class DfsBlockCache {
 		HashEntry(HashEntry n, Ref r) {
 			next = n;
 			ref = r;
+		}
+
+		public HashEntry clean() {
+			HashEntry top = this;
+			while (top != null && top.ref.next == null)
+				top = top.next;
+			if (top == null || top.next == null)
+				return null;
+			HashEntry n = top.next.clean();
+			return n == top.next ? top : new HashEntry(n, top.ref);
 		}
 	}
 
